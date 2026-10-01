@@ -1,0 +1,35 @@
+name: Assemble mp4 from b64 chunks
+on:
+  push:
+    paths:
+      - 'chunks/**'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble all
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for dir in chunks/*/; do
+            meta="$dir/meta.txt"
+            outname=$(grep '^name=' "$meta" | cut -d= -f2)
+            echo "Assembling $outname from $dir"
+            cat $(ls "$dir"/part* | sort) > /tmp/all.b64
+            base64 -d /tmp/all.b64 > "$outname"
+            file "$outname"
+            ls -la "$outname"
+          done
+          git config user.name "gold-fri-bot"
+          git config user.email "dwtrading@post.com"
+          git add *.mp4 || true
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Assemble creatives from chunks"
+            git push
+          fi
